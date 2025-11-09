@@ -281,6 +281,53 @@ export default function MainApp() {
 		finally { setLoadingNodeId(null); }
 	}, [nodes, connections, currentSessionId, loadingNodeId, updateSessionInDb]);
 
+	const handleAddCustomTopic = useCallback(async (parentNodeId: string, rawTitle: string) => {
+		const trimmedTitle = rawTitle.trim();
+		if (!trimmedTitle) {
+			return;
+		}
+
+		const parentNode = nodes.find((n) => n.id === parentNodeId);
+		if (!parentNode) {
+			toast.error("Unable to find the selected topic.");
+			return;
+		}
+
+		if (!currentSessionId) {
+			toast.error("Create or load a session before adding topics.");
+			return;
+		}
+
+		const placeholderContent = `## ${trimmedTitle}\n\nThis is a custom topic you added. Select it to generate a detailed overview or start chatting right away.`;
+
+		const newNode: Node = {
+			id: nanoid(),
+			title: trimmedTitle,
+			content: placeholderContent,
+			description: "Custom topic awaiting AI generation.",
+			depth: (parentNode.depth ?? 0) + 1,
+			position: { x: parentNode.position?.x ?? 0, y: parentNode.position?.y ?? 0 },
+			hasExplored: false,
+			parentId: parentNodeId,
+			chatHistory: [],
+		};
+
+		const newConnection: Connection = { id: nanoid(), source: parentNodeId, target: newNode.id };
+		const updatedNodes = [...nodes, newNode];
+		const updatedConnections = [...connections, newConnection];
+
+		setNodes(updatedNodes);
+		setConnections(updatedConnections);
+
+		try {
+			await updateSessionInDb(currentSessionId, updatedNodes, updatedConnections);
+			toast.success("Custom topic added.");
+		} catch (error) {
+			console.error("Error adding custom topic:", error);
+			toast.error("Failed to save custom topic.");
+		}
+	}, [connections, currentSessionId, nodes, updateSessionInDb]);
+
 	// --- Chat Management ---
 	const handleChatUpdate = (nodeId: string, chatHistory: ChatTurn[]) => {
 		const updatedNodes = nodes.map(n => n.id === nodeId ? { ...n, chatHistory } : n);
@@ -408,6 +455,7 @@ export default function MainApp() {
 										onNodeSelect={handleNodeSelectAndFetchContent}
 										onExpandNode={handleExpandNode}
 										loadingNodeId={loadingNodeId}
+										onAddCustomTopic={handleAddCustomTopic}
 									/>
 								)}
 							</AnimatePresence>

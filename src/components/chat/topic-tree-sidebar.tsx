@@ -6,6 +6,7 @@ import { ChevronRight, PlusSquare, Loader2, GitBranch, ArrowLeft } from 'lucide-
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Input } from '@/components/ui/input';
 
 // --- Helper Types & Constants ---
 
@@ -15,6 +16,7 @@ interface TopicTreeSidebarProps {
 	onNodeSelect: (nodeId: string) => void;
 	onExpandNode: (nodeId: string) => void;
 	loadingNodeId: string | null;
+	onAddCustomTopic: (parentId: string, title: string) => Promise<void> | void;
 }
 
 const listVariants = {
@@ -43,9 +45,12 @@ export default function TopicTreeSidebar({
 	onNodeSelect,
 	onExpandNode,
 	loadingNodeId,
+	onAddCustomTopic,
 }: TopicTreeSidebarProps) {
 	const [focusNodeId, setFocusNodeId] = useState<string | null>(null);
 	const [direction, setDirection] = useState(0);
+	const [customTopicTitle, setCustomTopicTitle] = useState("");
+	const [isAddingCustomTopic, setIsAddingCustomTopic] = useState(false);
 
 	useEffect(() => {
 		const rootNode = nodes.find(n => n.depth === 0);
@@ -55,6 +60,11 @@ export default function TopicTreeSidebar({
 			setFocusNodeId(null);
 		}
 	}, [nodes]);
+
+	useEffect(() => {
+		setCustomTopicTitle("");
+		setIsAddingCustomTopic(false);
+	}, [focusNodeId]);
 
 	const handleNodeClick = (nodeId: string) => {
 		onNodeSelect(nodeId);
@@ -71,6 +81,17 @@ export default function TopicTreeSidebar({
 	const focusNode = nodes.find(n => n.id === focusNodeId);
 	const parentNode = focusNode ? nodes.find(n => n.id === focusNode.parentId) : null;
 	const children = focusNodeId ? nodes.filter(n => n.parentId === focusNodeId) : [];
+
+	const handleCustomTopicSubmit = async () => {
+		if (!focusNodeId || !customTopicTitle.trim() || isAddingCustomTopic) return;
+		try {
+			setIsAddingCustomTopic(true);
+			await onAddCustomTopic(focusNodeId, customTopicTitle);
+			setCustomTopicTitle("");
+		} finally {
+			setIsAddingCustomTopic(false);
+		}
+	};
 
 	return (
 		<motion.div
@@ -143,6 +164,37 @@ export default function TopicTreeSidebar({
 								) : (
 									<div className="text-gray-500 text-sm text-center p-4">No sub-topics.</div>
 								)}
+							</div>
+
+							<div className="border-t border-gray-900/60 mt-4 pt-4 shrink-0">
+								<p className="text-xs uppercase tracking-wide text-gray-500 mb-2">
+									Add a topic under {focusNode?.title || "this section"}
+								</p>
+								<div className="flex items-center space-x-2">
+									<Input
+										value={customTopicTitle}
+										onChange={(e) => setCustomTopicTitle(e.target.value)}
+										onKeyDown={(e) => { if (e.key === 'Enter') handleCustomTopicSubmit(); }}
+										placeholder="Custom topic title"
+										className="bg-gray-900/70 border-gray-800 text-sm placeholder:text-gray-600 text-white"
+										disabled={!focusNodeId || isAddingCustomTopic}
+									/>
+									<Button
+										onClick={handleCustomTopicSubmit}
+										disabled={!customTopicTitle.trim() || !focusNodeId || isAddingCustomTopic}
+										variant="secondary"
+										className="bg-violet-600/80 hover:bg-violet-600 text-white border-none"
+									>
+										{isAddingCustomTopic ? (
+											<Loader2 className="h-4 w-4 animate-spin" />
+										) : (
+											<>
+												<PlusSquare className="h-4 w-4 mr-1" />
+												Add
+											</>
+										)}
+									</Button>
+								</div>
 							</div>
 						</motion.div>
 					) : (
